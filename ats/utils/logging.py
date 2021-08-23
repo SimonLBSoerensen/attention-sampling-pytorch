@@ -9,7 +9,6 @@ from tensorboardX import SummaryWriter
 
 
 def file_write(file_log, epoch, losses=None, metrics=None):
-    print(file_log)
     if losses is not None:
         with open(file_log, "a") as f:
             if not file_write.file_log_header_written:

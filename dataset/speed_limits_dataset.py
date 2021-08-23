@@ -34,15 +34,11 @@ def ensure_dataset_exists(directory, tries=1, progress_file=sys.stderr):
     """Ensure that the dataset is downloaded and is correct.
     Correctness is checked only against the annotations files.
     """
-    set1_url = ("http://www.isy.liu.se/cvl/research/trafficSigns"
-                "/swedishSignsSummer/Set1/Set1Part0.zip")
-    set1_annotations_url = ("http://www.isy.liu.se/cvl/research/trafficSigns"
-                            "/swedishSignsSummer/Set1/annotations.txt")
+    set1_url = "http://www.isy.liu.se/cvl/research/trafficSigns/swedishSignsSummer/Set1/Set1Part0.zip"
+    set1_annotations_url = "http://www.isy.liu.se/cvl/research/trafficSigns/swedishSignsSummer/Set1/annotations.txt"
     set1_annotations_md5 = "9106a905a86209c95dc9b51d12f520d6"
-    set2_url = ("http://www.isy.liu.se/cvl/research/trafficSigns"
-                "/swedishSignsSummer/Set2/Set2Part0.zip")
-    set2_annotations_url = ("http://www.isy.liu.se/cvl/research/trafficSigns"
-                            "/swedishSignsSummer/Set2/annotations.txt")
+    set2_url = "http://www.isy.liu.se/cvl/research/trafficSigns/swedishSignsSummer/Set2/Set2Part0.zip"
+    set2_annotations_url = "http://www.isy.liu.se/cvl/research/trafficSigns/swedishSignsSummer/Set2/annotations.txt"
     set2_annotations_md5 = "09debbc67f6cd89c1e2a2688ad1d03ca"
 
     integrity = (

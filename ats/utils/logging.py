@@ -23,8 +23,48 @@ class AttentionSaverTrafficSigns:
         self.x_high = torch.stack([d[1] for d in data]).cpu()
         self.labels = torch.LongTensor([d[2] for d in data]).numpy()
 
+        self.file_log = os.path.join(self.dir, opts.run_name, "log.csv")
+        self.file_log_header_written = False
+
         self.writer = SummaryWriter(os.path.join(self.dir, opts.run_name), flush_secs=5)
         self.on_train_begin()
+
+    def file_write(self, epoch, losses=None, metrics=None):
+        with open(self.file_log, "a") as f:
+            if not self.file_log_header_written:
+                header_list = ["epoch"]
+                if len(losses) == 2:
+                    header_list += ["train_loss", "test_loss"]
+                else:
+                    header_list += ["loss"]
+                if metrics is not None:
+                    if len(metrics) == 2:
+                        for key in metrics[0]:
+                            header_list += ["train_" + key]
+                        for key in metrics[1]:
+                            header_list += ["test_" + key]
+                    else:
+                        for key in metrics[0]:
+                            header_list += [key]
+
+                header = ",".join(header_list) + "\n"
+                f.write(header)
+
+                self.file_log_header_written = False
+
+        values_to_write = [epoch]
+
+        if losses is not None:
+            values_to_write += [*losses]
+
+        if metrics is not None:
+            for d in metrics:
+                for key in d:
+                    values_to_write += [d[key]]
+
+        value_list = ",".join(values_to_write)
+        f.write(value_list+"\n")
+
 
     def on_train_begin(self):
         opts = self.opts
@@ -58,6 +98,8 @@ class AttentionSaverTrafficSigns:
             train_loss, test_loss = losses
             self.writer.add_scalar('Loss/Train', train_loss, epoch)
             self.writer.add_scalar('Loss/Test', test_loss, epoch)
+
+        self.file_write(epoch, losses, metrics)
 
     @staticmethod
     def imsave(filepath, x):

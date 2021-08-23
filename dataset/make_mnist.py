@@ -309,7 +309,7 @@ def main(argv):
     )
 
     parser.add_argument(
-        "output_directory",
+        "--output_directory",
         default="mega_mnist",
         help="The directory to save the dataset into"
     )

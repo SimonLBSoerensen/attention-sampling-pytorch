@@ -30,6 +30,7 @@ class AttentionSaverTrafficSigns:
         self.on_train_begin()
 
     def file_write(self, epoch, losses=None, metrics=None):
+        print(self.file_log)
         with open(self.file_log, "a") as f:
             if not self.file_log_header_written:
                 header_list = ["epoch"]

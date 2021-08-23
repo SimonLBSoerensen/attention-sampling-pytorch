@@ -10,40 +10,41 @@ from tensorboardX import SummaryWriter
 
 def file_write(file_log, epoch, losses=None, metrics=None):
     print(file_log)
-    with open(file_log, "a") as f:
-        if not file_write.file_log_header_written:
-            header_list = ["epoch"]
-            if len(losses) == 2:
-                header_list += ["train_loss", "test_loss"]
-            else:
-                header_list += ["loss"]
-            if metrics is not None:
-                if len(metrics) == 2:
-                    for key in metrics[0]:
-                        header_list += ["train_" + key]
-                    for key in metrics[1]:
-                        header_list += ["test_" + key]
-                else:
-                    for key in metrics[0]:
-                        header_list += [key]
-
-            header = ",".join(header_list) + "\n"
-            f.write(header)
-
-            file_write.file_log_header_written = True
-
-    values_to_write = [epoch]
-
     if losses is not None:
-        values_to_write += [*losses]
+        with open(file_log, "a") as f:
+            if not file_write.file_log_header_written:
+                header_list = ["epoch"]
+                if len(losses) == 2:
+                    header_list += ["train_loss", "test_loss"]
+                else:
+                    header_list += ["loss"]
+                if metrics is not None:
+                    if len(metrics) == 2:
+                        for key in metrics[0]:
+                            header_list += ["train_" + key]
+                        for key in metrics[1]:
+                            header_list += ["test_" + key]
+                    else:
+                        for key in metrics[0]:
+                            header_list += [key]
 
-    if metrics is not None:
-        for d in metrics:
-            for key in d:
-                values_to_write += [d[key]]
+                header = ",".join(header_list) + "\n"
+                f.write(header)
 
-    value_list = ",".join(values_to_write)
-    f.write(value_list + "\n")
+                file_write.file_log_header_written = True
+
+            values_to_write = [epoch]
+
+            if losses is not None:
+                values_to_write += [*losses]
+
+            if metrics is not None:
+                for d in metrics:
+                    for key in d:
+                        values_to_write += [d[key]]
+
+            value_list = ",".join(values_to_write)
+            f.write(value_list + "\n")
 
 
 file_write.file_log_header_written = False

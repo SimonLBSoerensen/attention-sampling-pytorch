@@ -43,7 +43,7 @@ def file_write(file_log, epoch, losses=None, metrics=None):
                     for key in d:
                         values_to_write += [d[key]]
 
-            value_list = ",".join(values_to_write)
+            value_list = ",".join([str(el) for el in values_to_write])
             f.write(value_list + "\n")
 
 

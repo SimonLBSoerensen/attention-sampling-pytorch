@@ -65,7 +65,7 @@ def main(opts):
 
         if opts.use_wandb:
             # Todo make wandb log better with *_metrics
-            wandb.log({"train_loss": train_loss, "test_loss": test_loss,
+            wandb.log({"epoch":epoch, "train_loss": train_loss, "test_loss": test_loss,
                        "train_accuracy": train_metrics["accuracy"], "test_accuracy": test_metrics["accuracy"]})
         logger(epoch, (train_loss, test_loss), (train_metrics, test_metrics))
         scheduler.step()

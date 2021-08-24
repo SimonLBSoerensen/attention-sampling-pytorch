@@ -260,7 +260,10 @@ class SpeedLimits(Dataset):
     CLASSES = ["EMPTY", *LIMITS]
 
     def __init__(self, directory, train=True, seed=0):
+        # Create list with tuples of (image path, image class)
         self._data = self._filter(STS(directory, train, seed))
+
+        # Define data augmentation
         if train:
             self.image_transform = transforms.Compose([transforms.ColorJitter(0.1, 0.1, 0.1, 0.1),
                                                        transforms.RandomAffine(degrees=0,
@@ -272,20 +275,29 @@ class SpeedLimits(Dataset):
             self.image_transform = transforms.Compose([transforms.ToTensor()
                                                        # transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
                                                        ])
-
+        # Calculate the sampling weights for the images depending on the class the image belongs to
         weights = make_weights_for_balanced_classes(self._data, len(self.CLASSES))
         weights = torch.DoubleTensor(weights)
+
+        # Make the sampler there will sample images depending on the weights they have been given
         self.sampler = torch.utils.data.sampler.WeightedRandomSampler(weights, len(weights))
 
     def _filter(self, data):
         filtered = []
         for image, signs in data:
+            # Check if there is a speed limits sign and if it is visible then is will be acceptable if there is
+            # only other signs or the speed limits is not visible then not acceptable
+            # empty (no signs at all) is also acceptable
             signs, acceptable = self._acceptable(signs)
             if acceptable:
                 if not signs:
+                    # If the image is empty the it belongs to class 0
                     filtered.append((image, 0))
                 else:
+                    # If there is a speed limit sign then the class is the index of the sign in self.CLASSES
                     filtered.append((image, self.CLASSES.index(signs[0].name)))
+        # Return a list of (image path, image class) pers
+        # where the classes are of the empty class or one of the speed limits
         return filtered
 
     def _acceptable(self, signs):
@@ -310,12 +322,17 @@ class SpeedLimits(Dataset):
         return len(self._data)
 
     def __getitem__(self, i):
+        # Get the image path and class of image
         image, category = self._data[i]
 
+        # Load the high resolution image and perform the image transformation (data augmentation)
         x_high = Image.open(image)
         x_high = self.image_transform(x_high)
 
+        # Down scale the high resolution image to the low resolution there is used for the attention map
         x_low = F.interpolate(x_high[None, ...], scale_factor=0.3, mode='bilinear')[0]
+
+        # Return the low resolution, high resolution and class of the given index
         return x_low, x_high, category
 
     @property

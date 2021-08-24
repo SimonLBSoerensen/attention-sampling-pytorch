@@ -70,12 +70,18 @@ def main(opts):
             test_loss, test_metrics = evaluate(ats_model, test_loader, criterion,
                                                entropy_loss_func, opts)
 
+        # Log results
         if opts.use_wandb:
-            # Todo make wandb log better with *_metrics
-            wandb.log({"epoch": epoch, "train_loss": train_loss, "test_loss": test_loss,
-                       "train_accuracy": train_metrics["accuracy"], "test_accuracy": test_metrics["accuracy"]})
+            log_dict = {"epoch": epoch, "train_loss": train_loss, "test_loss": test_loss}
+            for metric in train_metrics:
+                log_dict["train_" + metric] = train_metrics[metric]
+            for metric in test_metrics:
+                log_dict["test_" + metric] = test_metrics[metric]
+            wandb.log(log_dict)
+
         logger(epoch, (train_loss, test_loss), (train_metrics, test_metrics))
-        scheduler.step()
+
+        # Save progress
 
         if test_loss < best_test_loss:
             best_test_loss = test_loss
@@ -84,6 +90,9 @@ def main(opts):
 
         if epoch % opts.saving_epoch == 0:
             save_checkpoint(ats_model, optimizer, os.path.join(model_folder, f"model_{epoch}.pth"), epoch)
+
+        # Perform scheduler step
+        scheduler.step()
 
 
 if __name__ == '__main__':

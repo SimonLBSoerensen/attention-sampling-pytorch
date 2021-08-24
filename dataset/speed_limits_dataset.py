@@ -25,6 +25,7 @@ def check_file(filepath, md5sum):
         with open(filepath, "rb") as f:
             for chunk in iter(partial(f.read, 4096), b""):
                 md5.update(chunk)
+        print(filepath, md5.hexdigest())
         return md5.hexdigest() == md5sum
     except FileNotFoundError:
         return False
@@ -36,10 +37,10 @@ def ensure_dataset_exists(directory, tries=1, progress_file=sys.stderr):
     """
     set1_url = "http://www.isy.liu.se/cvl/research/trafficSigns/swedishSignsSummer/Set1/Set1Part0.zip"
     set1_annotations_url = "http://www.isy.liu.se/cvl/research/trafficSigns/swedishSignsSummer/Set1/annotations.txt"
-    set1_annotations_md5 = "9106a905a86209c95dc9b51d12f520d6"
+    set1_annotations_md5 = "abc2432cb4433e314b7db116f0a80324"
     set2_url = "http://www.isy.liu.se/cvl/research/trafficSigns/swedishSignsSummer/Set2/Set2Part0.zip"
     set2_annotations_url = "http://www.isy.liu.se/cvl/research/trafficSigns/swedishSignsSummer/Set2/annotations.txt"
-    set2_annotations_md5 = "09debbc67f6cd89c1e2a2688ad1d03ca"
+    set2_annotations_md5 = "5c575d53bc06750126932e80217970f9"
 
     integrity = (
             check_file(
@@ -59,29 +60,39 @@ def ensure_dataset_exists(directory, tries=1, progress_file=sys.stderr):
                             "is corrupted"))
 
     print("Downloading Set1", file=progress_file)
-    download_file(set1_url, path.join(directory, "Set1.zip"),
-                  progress_file=progress_file)
+    print(path.join(directory, "Set1Part0.zip"))
+    zip_1_file = path.join(directory, "Set1Part0.zip")
+    if not os.path.exists(zip_1_file):
+        download_file(set1_url, zip_1_file,
+                      progress_file=progress_file)
     print("Extracting...", file=progress_file)
-    with zipfile.ZipFile(path.join(directory, "Set1.zip")) as archive:
+    with zipfile.ZipFile(path.join(directory, "Set1Part0.zip")) as archive:
         archive.extractall(path.join(directory, "Set1"))
     print("Getting annotation file", file=progress_file)
-    download_file(
-        set1_annotations_url,
-        path.join(directory, "Set1", "annotations.txt"),
-        progress_file=progress_file
-    )
+    zip_1_anno_file = path.join(directory, "Set1", "annotations.txt")
+    if not os.path.exists(zip_1_anno_file):
+        download_file(
+            set1_annotations_url,
+            zip_1_anno_file,
+            progress_file=progress_file
+        )
+
     print("Downloading Set2", file=progress_file)
-    download_file(set2_url, path.join(directory, "Set2.zip"),
-                  progress_file=progress_file)
+    zip_2_file = path.join(directory, "Set2Part0.zip")
+    if not os.path.exists(zip_2_file):
+        download_file(set2_url, zip_2_file,
+                      progress_file=progress_file)
     print("Extracting...", file=progress_file)
-    with zipfile.ZipFile(path.join(directory, "Set2.zip")) as archive:
+    with zipfile.ZipFile(path.join(directory, "Set2Part0.zip")) as archive:
         archive.extractall(path.join(directory, "Set2"))
     print("Getting annotation file", file=progress_file)
-    download_file(
-        set2_annotations_url,
-        path.join(directory, "Set2", "annotations.txt"),
-        progress_file=progress_file
-    )
+    zip_2_anno_file = path.join(directory, "Set2", "annotations.txt")
+    if not os.path.exists(zip_2_anno_file):
+        download_file(
+            set2_annotations_url,
+            zip_2_anno_file,
+            progress_file=progress_file
+        )
 
     return ensure_dataset_exists(
         directory,
@@ -172,7 +183,7 @@ class STS:
     Sign objects."""
 
     def __init__(self, directory, train=True, seed=0):
-        cwd = os.getcwd().replace('dataset', '')
+        cwd = os.getcwd()
         directory = path.join(cwd, directory)
         ensure_dataset_exists(directory)
 

@@ -16,8 +16,13 @@ from ats.utils.logging import AttentionSaverTrafficSigns
 from dataset.speed_limits_dataset import SpeedLimits
 from train import train, evaluate
 
+import wandb
+
 
 def main(opts):
+    if opts.use_wandb:
+        wandb.init(project="traffic_data")
+
     train_dataset = SpeedLimits('dataset/traffic_data', train=True)
     train_loader = DataLoader(train_dataset, batch_size=opts.batch_size, shuffle=True, num_workers=opts.num_workers)
 
@@ -28,7 +33,8 @@ def main(opts):
     feature_model = FeatureModelTrafficSigns(in_channels=3, strides=[1, 2, 2, 2], filters=[32, 32, 32, 32])
     classification_head = ClassificationHead(in_channels=32, num_classes=len(train_dataset.CLASSES))
 
-    ats_model = ATSModel(attention_model, feature_model, classification_head, n_patches=opts.n_patches, patch_size=opts.patch_size)
+    ats_model = ATSModel(attention_model, feature_model, classification_head, n_patches=opts.n_patches,
+                         patch_size=opts.patch_size)
     ats_model = ats_model.to(opts.device)
     optimizer = optim.Adam([{'params': ats_model.attention_model.part1.parameters(), 'weight_decay': 1e-5},
                             {'params': ats_model.attention_model.part2.parameters()},
@@ -46,6 +52,9 @@ def main(opts):
     criterion = nn.CrossEntropyLoss(weight=class_weights)
     entropy_loss_func = MultinomialEntropy(opts.regularizer_strength)
 
+    if opts.use_wandb:
+        wandb.watch(ats_model, log_freq=100)
+
     for epoch in range(opts.epochs):
         train_loss, train_metrics = train(ats_model, optimizer, train_loader,
                                           criterion, entropy_loss_func, opts)
@@ -54,6 +63,10 @@ def main(opts):
             test_loss, test_metrics = evaluate(ats_model, test_loader, criterion,
                                                entropy_loss_func, opts)
 
+        if opts.use_wandb:
+            # Todo make wandb log better with *_metrics
+            wandb.log({"train_loss": train_loss, "test_loss": test_loss,
+                       "train_accuracy": train_metrics["accuracy"], "test_accuracy": test_metrics["accuracy"]})
         logger(epoch, (train_loss, test_loss), (train_metrics, test_metrics))
         scheduler.step()
 
@@ -68,12 +81,13 @@ if __name__ == '__main__':
     parser.add_argument("--n_patches", type=int, default=5, help="How many patches to sample")
     parser.add_argument("--patch_size", type=int, default=100, help="Patch size of a square patch")
     parser.add_argument("--batch_size", type=int, default=32, help="Choose the batch size for SGD")
-    parser.add_argument("--epochs", type=int, default=500, help="How many epochs to train for")
+    parser.add_argument("--epochs", type=int, default=1500, help="How many epochs to train for")
     parser.add_argument("--decrease_lr_at", type=float, default=250, help="Decrease the learning rate in this epoch")
     parser.add_argument("--clipnorm", type=float, default=1, help="Clip the norm of the gradients")
     parser.add_argument("--output_dir", type=str, help="An output directory", default='output/traffic')
     parser.add_argument('--run_name', type=str, default='run')
-    parser.add_argument('--num_workers', type=int, default=20, help='Number of workers to use for data loading')
+    parser.add_argument('--use_wandb', type=bool, default=True)
+    parser.add_argument('--num_workers', type=int, default=30, help='Number of workers to use for data loading')
 
     opts = parser.parse_args()
     opts.run_name = f"{opts.run_name}_{time.strftime('%Y%m%dT%H%M%S')}"

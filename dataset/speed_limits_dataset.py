@@ -1,3 +1,4 @@
+import glob
 from collections import namedtuple
 from functools import partial
 import hashlib
@@ -30,6 +31,8 @@ def check_file(filepath, md5sum):
     except FileNotFoundError:
         return False
 
+def files_are_extracted(directory):
+    return len(glob.glob(os.path.join(directory, "*"))) > 1
 
 def ensure_dataset_exists(directory, tries=1, progress_file=sys.stderr):
     """Ensure that the dataset is downloaded and is correct.
@@ -42,35 +45,45 @@ def ensure_dataset_exists(directory, tries=1, progress_file=sys.stderr):
     set2_annotations_url = "http://www.isy.liu.se/cvl/research/trafficSigns/swedishSignsSummer/Set2/annotations.txt"
     set2_annotations_md5 = "5c575d53bc06750126932e80217970f9"
 
-    print("Downloading Set1", file=progress_file)
-    print(path.join(directory, "Set1Part0.zip"))
     zip_1_file = path.join(directory, "Set1Part0.zip")
     if not os.path.exists(zip_1_file):
+        print("Downloading Set1", file=progress_file)
         download_file(set1_url, zip_1_file,
                       progress_file=progress_file)
-    print("Extracting...", file=progress_file)
-    with zipfile.ZipFile(path.join(directory, "Set1Part0.zip")) as archive:
-        archive.extractall(path.join(directory, "Set1"))
-    print("Getting annotation file", file=progress_file)
+    else:
+        print("Set1 zip ex")
+
+    set1_extract = path.join(directory, "Set1")
+    if not(files_are_extracted(set1_extract)):
+        print("Extracting...", file=progress_file)
+        with zipfile.ZipFile(path.join(directory, "Set1Part0.zip")) as archive:
+            archive.extractall(set1_extract)
+
+
     zip_1_anno_file = path.join(directory, "Set1", "annotations.txt")
     if not os.path.exists(zip_1_anno_file):
+        print("Getting annotation file", file=progress_file)
         download_file(
             set1_annotations_url,
             zip_1_anno_file,
             progress_file=progress_file
         )
 
-    print("Downloading Set2", file=progress_file)
     zip_2_file = path.join(directory, "Set2Part0.zip")
     if not os.path.exists(zip_2_file):
+        print("Downloading Set2", file=progress_file)
         download_file(set2_url, zip_2_file,
                       progress_file=progress_file)
-    print("Extracting...", file=progress_file)
-    with zipfile.ZipFile(path.join(directory, "Set2Part0.zip")) as archive:
-        archive.extractall(path.join(directory, "Set2"))
-    print("Getting annotation file", file=progress_file)
+
+    set2_extract = path.join(directory, "Set2")
+    if not (files_are_extracted(set2_extract)):
+        print("Extracting...", file=progress_file)
+        with zipfile.ZipFile(path.join(directory, "Set2Part0.zip")) as archive:
+            archive.extractall(set2_extract)
+
     zip_2_anno_file = path.join(directory, "Set2", "annotations.txt")
     if not os.path.exists(zip_2_anno_file):
+        print("Getting annotation file", file=progress_file)
         download_file(
             set2_annotations_url,
             zip_2_anno_file,

@@ -30,6 +30,34 @@ def main(opts):
     feature_model = FeatureModelTrafficSigns(in_channels=3, strides=[1, 2, 2, 2], filters=[32, 32, 32, 32])
     classification_head = ClassificationHead(in_channels=32, num_classes=len(train_dataset.CLASSES))
 
+    ats_model = ATSModel(attention_model, feature_model, classification_head, n_patches=opts.n_patches, patch_size=opts.patch_size)
+    ats_model = ats_model.to(opts.device)
+    optimizer = optim.Adam([{'params': ats_model.attention_model.part1.parameters(), 'weight_decay': 1e-5},
+                            {'params': ats_model.attention_model.part2.parameters()},
+                            {'params': ats_model.feature_model.parameters()},
+                            {'params': ats_model.classifier.parameters()},
+                            {'params': ats_model.sampler.parameters()},
+                            {'params': ats_model.expectation.parameters()}
+                            ], lr=opts.lr)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=opts.decrease_lr_at, gamma=0.1)
+
+    logger = AttentionSaverTrafficSigns(opts.output_dir, ats_model, test_dataset, opts)
+    class_weights = train_dataset.class_frequencies
+    class_weights = torch.from_numpy((1. / len(class_weights)) / class_weights).to(opts.device)
+
+    criterion = nn.CrossEntropyLoss(weight=class_weights)
+    entropy_loss_func = MultinomialEntropy(opts.regularizer_strength)
+
+    test_loss, test_metrics = evaluate(ats_model, test_loader, criterion, entropy_loss_func, opts)
+    print(test_loss, test_metrics)
+    save_checkpoint(ats_model, optimizer, "test.pth", 0)
+
+    del attention_model,feature_model, classification_head,ats_model, optimizer,scheduler
+
+    attention_model = AttentionModelTrafficSigns(squeeze_channels=True, softmax_smoothing=1e-4)
+    feature_model = FeatureModelTrafficSigns(in_channels=3, strides=[1, 2, 2, 2], filters=[32, 32, 32, 32])
+    classification_head = ClassificationHead(in_channels=32, num_classes=len(train_dataset.CLASSES))
+
     ats_model = ATSModel(attention_model, feature_model, classification_head, n_patches=opts.n_patches,
                          patch_size=opts.patch_size)
     ats_model = ats_model.to(opts.device)
@@ -49,8 +77,11 @@ def main(opts):
     criterion = nn.CrossEntropyLoss(weight=class_weights)
     entropy_loss_func = MultinomialEntropy(opts.regularizer_strength)
 
-    save_checkpoint(ats_model, optimizer, "test.pth", 0)
+    ats_model, optimizer, epoch = load_checkpoint(ats_model,optimizer,"test.pth")
+    test_loss, test_metrics = evaluate(ats_model, test_loader, criterion, entropy_loss_func, opts)
+    print(test_loss, test_metrics, epoch)
 
+    # (1.0517, ä'accuracy': 0.12134502923976608ü)
 
 
 

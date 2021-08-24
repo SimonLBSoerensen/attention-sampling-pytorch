@@ -42,23 +42,6 @@ def ensure_dataset_exists(directory, tries=1, progress_file=sys.stderr):
     set2_annotations_url = "http://www.isy.liu.se/cvl/research/trafficSigns/swedishSignsSummer/Set2/annotations.txt"
     set2_annotations_md5 = "5c575d53bc06750126932e80217970f9"
 
-    integrity = (
-            check_file(
-                path.join(directory, "Set1", "annotations.txt"),
-                set1_annotations_md5
-            ) and check_file(
-        path.join(directory, "Set2", "annotations.txt"),
-        set2_annotations_md5
-    )
-    )
-
-    if integrity:
-        return
-
-    if tries <= 0:
-        raise RuntimeError(("Cannot download dataset or dataset download "
-                            "is corrupted"))
-
     print("Downloading Set1", file=progress_file)
     print(path.join(directory, "Set1Part0.zip"))
     zip_1_file = path.join(directory, "Set1Part0.zip")
@@ -94,11 +77,21 @@ def ensure_dataset_exists(directory, tries=1, progress_file=sys.stderr):
             progress_file=progress_file
         )
 
-    return ensure_dataset_exists(
-        directory,
-        tries=tries - 1,
-        progress_file=progress_file
+    integrity = (
+            check_file(
+                path.join(directory, "Set1", "annotations.txt"),
+                set1_annotations_md5
+            ) and check_file(
+                        path.join(directory, "Set2", "annotations.txt"),
+                        set2_annotations_md5
+                    )
     )
+
+    if integrity:
+        return
+    else:
+        raise RuntimeError(("Cannot download dataset or dataset download "
+                            "is corrupted"))
 
 
 def download_file(url, destination, progress_file=sys.stderr):

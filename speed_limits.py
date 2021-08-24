@@ -1,3 +1,5 @@
+import os
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -14,7 +16,7 @@ from ats.utils.regularizers import MultinomialEntropy
 from ats.utils.logging import AttentionSaverTrafficSigns
 
 from dataset.speed_limits_dataset import SpeedLimits
-from train import train, evaluate
+from train import train, evaluate, save_checkpoint
 
 import wandb
 
@@ -22,6 +24,11 @@ import wandb
 def main(opts):
     if opts.use_wandb:
         wandb.init(project="traffic_data")
+
+    best_test_loss = 10e50
+
+    model_folder = os.path.join(opts.output_dir, opts.run_name, "saves")
+    os.makedirs(model_folder)
 
     train_dataset = SpeedLimits('dataset/traffic_data', train=True)
     train_loader = DataLoader(train_dataset, batch_size=opts.batch_size, shuffle=True, num_workers=opts.num_workers)
@@ -65,10 +72,18 @@ def main(opts):
 
         if opts.use_wandb:
             # Todo make wandb log better with *_metrics
-            wandb.log({"epoch":epoch, "train_loss": train_loss, "test_loss": test_loss,
+            wandb.log({"epoch": epoch, "train_loss": train_loss, "test_loss": test_loss,
                        "train_accuracy": train_metrics["accuracy"], "test_accuracy": test_metrics["accuracy"]})
         logger(epoch, (train_loss, test_loss), (train_metrics, test_metrics))
         scheduler.step()
+
+        if test_loss < best_test_loss:
+            best_test_loss = test_loss
+            if opts.save_best:
+                save_checkpoint(ats_model, optimizer, os.path.join(model_folder, f"model_best.pth"), epoch)
+
+        if epoch % opts.saving_epoch == 0:
+            save_checkpoint(ats_model, optimizer, os.path.join(model_folder, f"model_{epoch}.pth"), epoch)
 
 
 if __name__ == '__main__':
@@ -87,6 +102,8 @@ if __name__ == '__main__':
     parser.add_argument("--output_dir", type=str, help="An output directory", default='output/traffic')
     parser.add_argument('--run_name', type=str, default='run')
     parser.add_argument('--use_wandb', type=bool, default=True)
+    parser.add_argument('--save_best', type=bool, default=True)
+    parser.add_argument("--saving_epoch", type=int, default=100, help="How many epochs between each save")
     parser.add_argument('--num_workers', type=int, default=30, help='Number of workers to use for data loading')
 
     opts = parser.parse_args()

@@ -394,6 +394,3 @@ if __name__ == '__main__':
     speedlimit_dataset = SpeedLimits('traffic_data')
 
     speedlimit_dataloader = DataLoader(speedlimit_dataset, shuffle=True, batch_size=4)
-
-    for i, (x_low, x_high, label) in enumerate(speedlimit_dataloader):
-        print(x_low)

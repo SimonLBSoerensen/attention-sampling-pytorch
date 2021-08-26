@@ -10,6 +10,8 @@ import argparse
 import json
 from os import path
 
+from tqdm.auto import tqdm
+
 from keras.datasets import mnist
 import numpy as np
 from skimage.transform import rescale
@@ -240,12 +242,7 @@ def sparsify(dataset):
 
     print("Sparsifying dataset")
     data = []
-    for i, ((x_low, x_high), y) in enumerate(dataset):
-        print(
-            "\u001b[1000DProcessing {:5d} /  {:5d}".format(i+1, len(dataset)),
-            end="",
-            flush=True
-        )
+    for i, ((x_low, x_high), y) in enumerate(tqdm(dataset, desc="Processing")):
         data.append((
             to_sparse(x_low),
             to_sparse(x_high),

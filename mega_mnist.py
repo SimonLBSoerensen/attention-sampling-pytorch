@@ -1,3 +1,5 @@
+import os
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -14,10 +16,19 @@ from ats.utils.regularizers import MultinomialEntropy
 from ats.utils.logging import AttentionSaverMNIST
 
 from dataset.mega_mnist_dataset import MNIST
-from train import train, evaluate
+from train import train, evaluate, save_checkpoint
 
+import wandb
 
 def main(opts):
+    if opts.use_wandb:
+        wandb.init(project="mega_mnist")
+
+    best_test_loss = 10e50
+
+    model_folder = os.path.join(opts.output_dir, opts.run_name, "saves")
+    os.makedirs(model_folder)
+
     train_dataset = MNIST('dataset/mega_mnist', train=True)
     train_loader = DataLoader(train_dataset, batch_size=opts.batch_size, shuffle=True, num_workers=1)
 
@@ -38,6 +49,9 @@ def main(opts):
     criterion = nn.CrossEntropyLoss()
     entropy_loss_func = MultinomialEntropy(opts.regularizer_strength)
 
+    if opts.use_wandb:
+        wandb.watch(ats_model, log_freq=100)
+
     for epoch in range(opts.epochs):
         train_loss, train_metrics = train(ats_model, optimizer, train_loader,
                                           criterion, entropy_loss_func, opts)
@@ -45,8 +59,24 @@ def main(opts):
         with torch.no_grad():
             test_loss, test_metrics = evaluate(ats_model, test_loader, criterion,
                                                entropy_loss_func, opts)
+        if opts.use_wandb:
+            log_dict = {"epoch": epoch, "train_loss": train_loss, "test_loss": test_loss}
+            for metric in train_metrics:
+                log_dict["train_" + metric] = train_metrics[metric]
+            for metric in test_metrics:
+                log_dict["test_" + metric] = test_metrics[metric]
+            wandb.log(log_dict)
 
         logger(epoch, (train_loss, test_loss), (train_metrics, test_metrics))
+
+        if test_loss < best_test_loss:
+            best_test_loss = test_loss
+            if opts.save_best:
+                save_checkpoint(ats_model, optimizer, os.path.join(model_folder, f"model_best.pth"), epoch)
+
+        if epoch % opts.saving_epoch == 0:
+            save_checkpoint(ats_model, optimizer, os.path.join(model_folder, f"model_{epoch}.pth"), epoch)
+
         scheduler.step()
 
 
@@ -60,11 +90,14 @@ if __name__ == '__main__':
     parser.add_argument("--n_patches", type=int, default=10, help="How many patches to sample")
     parser.add_argument("--patch_size", type=int, default=50, help="Patch size of a square patch")
     parser.add_argument("--batch_size", type=int, default=128, help="Choose the batch size for SGD")
-    parser.add_argument("--epochs", type=int, default=500, help="How many epochs to train for")
+    parser.add_argument("--epochs", type=int, default=1000, help="How many epochs to train for")
     parser.add_argument("--decrease_lr_at", type=float, default=1000, help="Decrease the learning rate in this epoch")
     parser.add_argument("--clipnorm", type=float, default=1, help="Clip the norm of the gradients")
     parser.add_argument("--output_dir", type=str, help="An output directory", default='output/mnist')
     parser.add_argument('--run_name', type=str, default='run')
+    parser.add_argument('--use_wandb', type=bool, default=True)
+    parser.add_argument('--save_best', type=bool, default=True)
+    parser.add_argument("--saving_epoch", type=int, default=100, help="How many epochs between each save")
     parser.add_argument('--num_workers', type=int, default=20, help='Number of workers to use for data loading')
 
     opts = parser.parse_args()

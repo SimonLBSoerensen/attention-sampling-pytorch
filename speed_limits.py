@@ -13,10 +13,11 @@ from models.classifier import ClassificationHead
 
 from ats.core.ats_layer import ATSModel
 from ats.utils.regularizers import MultinomialEntropy
-from ats.utils.logging import AttentionSaverTrafficSigns
+from ats.utils.logging import TrainingLogger
+from ats.utils.model_checkpoint import ModelCheckpoint
 
 from dataset.speed_limits_dataset import SpeedLimits
-from train import train, evaluate, save_checkpoint
+from train import train, evaluate
 
 import wandb
 
@@ -24,11 +25,6 @@ import wandb
 def main(opts):
     if opts.use_wandb:
         wandb.init(project="traffic_data")
-
-    best_test_loss = 10e50
-
-    model_folder = os.path.join(opts.output_dir, opts.run_name, "saves")
-    os.makedirs(model_folder)
 
     train_dataset = SpeedLimits('dataset/traffic_data', train=True)
     train_loader = DataLoader(train_dataset, batch_size=opts.batch_size, shuffle=True, num_workers=opts.num_workers)
@@ -52,7 +48,12 @@ def main(opts):
                             ], lr=opts.lr)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=opts.decrease_lr_at, gamma=0.1)
 
-    logger = AttentionSaverTrafficSigns(opts.output_dir, ats_model, test_dataset, opts)
+    logger = TrainingLogger(opts.output_dir, ats_model, test_dataset)
+
+    model_folder = os.path.join(opts.output_dir, opts.run_name, "saves")
+    model_checkpoint = ModelCheckpoint(model_folder, ats_model, optimizer, save_best=True, save_frequency=100)
+
+
     class_weights = train_dataset.class_frequencies
     class_weights = torch.from_numpy((1. / len(class_weights)) / class_weights).to(opts.device)
 
@@ -80,16 +81,7 @@ def main(opts):
             wandb.log(log_dict)
 
         logger(epoch, (train_loss, test_loss), (train_metrics, test_metrics))
-
-        # Save progress
-
-        if test_loss < best_test_loss:
-            best_test_loss = test_loss
-            if opts.save_best:
-                save_checkpoint(ats_model, optimizer, os.path.join(model_folder, f"model_best.pth"), epoch)
-
-        if epoch % opts.saving_epoch == 0:
-            save_checkpoint(ats_model, optimizer, os.path.join(model_folder, f"model_{epoch}.pth"), epoch)
+        model_checkpoint(epoch, test_loss)
 
         # Perform scheduler step
         scheduler.step()

@@ -72,19 +72,4 @@ def evaluate(model, test_loader, criterion, entropy_loss_func, opts):
     metrics = calc_cls_measures(y_probs, y_trues)
     return test_loss_epoch, metrics
 
-# TODO test if they work------------------------------------------
-def save_checkpoint(model, optimizer, save_path, epoch):
-    state_dict = {}
-    state_dict['model_state_dict'] = model.state_dict()
-    state_dict['optimizer_state_dict'] = optimizer.state_dict()
-    state_dict['epoch'] = epoch
-    torch.save(state_dict, save_path)
 
-
-def load_checkpoint(model, optimizer, load_path):
-    checkpoint = torch.load(load_path)
-    model.load_state_dict(checkpoint['model_state_dict'])
-    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-    epoch = checkpoint['epoch']
-    return model, optimizer, epoch
-#----------------------------------------------------------------

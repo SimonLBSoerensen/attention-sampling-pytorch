@@ -13,10 +13,11 @@ from models.classifier import ClassificationHead
 
 from ats.core.ats_layer import ATSModel
 from ats.utils.regularizers import MultinomialEntropy
-from ats.utils.logging import AttentionSaverMNIST
+from ats.utils.logging import TrainingLogger
+from ats.utils.model_checkpoint import ModelCheckpoint
 
 from dataset.mega_mnist_dataset import MNIST
-from train import train, evaluate, save_checkpoint
+from train import train, evaluate
 
 import wandb
 
@@ -25,9 +26,6 @@ def main(opts):
         wandb.init(project="mega_mnist")
 
     best_test_loss = 10e50
-
-    model_folder = os.path.join(opts.output_dir, opts.run_name, "saves")
-    os.makedirs(model_folder)
 
     train_dataset = MNIST('dataset/mega_mnist', train=True)
     train_loader = DataLoader(train_dataset, batch_size=opts.batch_size, shuffle=True, num_workers=1)
@@ -44,7 +42,10 @@ def main(opts):
     optimizer = optim.Adam(ats_model.parameters(), lr=opts.lr)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=opts.decrease_lr_at, gamma=0.1)
 
-    logger = AttentionSaverMNIST(opts.output_dir, ats_model, test_dataset, opts)
+    logger = TrainingLogger(opts.output_dir, ats_model, test_dataset)
+
+    model_folder = os.path.join(opts.output_dir, opts.run_name, "saves")
+    model_checkpoint = ModelCheckpoint(model_folder, ats_model, optimizer, save_best=True, save_frequency=100)
 
     criterion = nn.CrossEntropyLoss()
     entropy_loss_func = MultinomialEntropy(opts.regularizer_strength)
@@ -68,14 +69,7 @@ def main(opts):
             wandb.log(log_dict)
 
         logger(epoch, (train_loss, test_loss), (train_metrics, test_metrics))
-
-        if test_loss < best_test_loss:
-            best_test_loss = test_loss
-            if opts.save_best:
-                save_checkpoint(ats_model, optimizer, os.path.join(model_folder, f"model_best.pth"), epoch)
-
-        if epoch % opts.saving_epoch == 0:
-            save_checkpoint(ats_model, optimizer, os.path.join(model_folder, f"model_{epoch}.pth"), epoch)
+        model_checkpoint(epoch, test_loss)
 
         scheduler.step()
 

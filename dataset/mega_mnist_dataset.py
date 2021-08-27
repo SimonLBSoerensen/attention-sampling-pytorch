@@ -27,6 +27,11 @@ class MNIST(Dataset):
         self._data = np.load(path.join(dataset_dir, filename), allow_pickle=True)
         self.image_transform = transforms.Normalize([0.5], [0.5])
 
+        self.labels = np.argmax(np.vstack(self._data[:,2]), axis=1)
+
+        self._uclasses = np.unique(self.labels)
+        self._class_indexs = {c: np.where(self.labels == c)[0] for c in self._uclasses}
+
     def __len__(self):
         return len(self._data)
 
@@ -52,6 +57,28 @@ class MNIST(Dataset):
         label = np.argmax(data[2])
 
         return x_low, x_high, label
+
+    def strided(self, N):
+        """Extract N images almost in equal proportions from each category."""
+
+        idxs = []
+
+        # Get class indexs
+        per_class = np.floor(N/len(self._uclasses))
+        left_over = N % len(self._uclasses)
+
+        if per_class:
+            for c in self._uclasses:
+                replace = len(self._class_indexs[c]) >= per_class
+                idxs += list(np.random.choice(self._class_indexs[c], per_class, replace=replace))
+
+        if left_over:
+            classes = np.copy(self._uclasses)
+            np.random.shuffle(classes)
+            for c in classes[:left_over]:
+                idxs += list(np.random.choice(self._class_indexs[c], 1))
+
+        return idxs
 
 
 if __name__ == '__main__':

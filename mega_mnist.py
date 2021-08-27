@@ -13,20 +13,13 @@ from models.classifier import ClassificationHead
 
 from ats.core.ats_layer import ATSModel
 from ats.utils.regularizers import MultinomialEntropy
-from ats.utils.logging import TrainingLogger
+from ats.utils.logging import TrainingLogger, WandBLogger
 from ats.utils.model_checkpoint import ModelCheckpoint
 
 from dataset.mega_mnist_dataset import MNIST
 from train import train, evaluate
 
-import wandb
-
 def main(opts):
-    if opts.use_wandb:
-        wandb.init(project="mega_mnist")
-
-    best_test_loss = 10e50
-
     train_dataset = MNIST('dataset/mega_mnist', train=True)
     train_loader = DataLoader(train_dataset, batch_size=opts.batch_size, shuffle=True, num_workers=1)
 
@@ -42,16 +35,14 @@ def main(opts):
     optimizer = optim.Adam(ats_model.parameters(), lr=opts.lr)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=opts.decrease_lr_at, gamma=0.1)
 
-    logger = TrainingLogger(opts.output_dir, ats_model, test_dataset)
+    logger = TrainingLogger(os.path.join(opts.output_dir, opts.run_name), ats_model, test_dataset)
+    wandb_logger = WandBLogger(ats_model, 100, project="mega_mnist")
 
     model_folder = os.path.join(opts.output_dir, opts.run_name, "saves")
     model_checkpoint = ModelCheckpoint(model_folder, ats_model, optimizer, save_best=True, save_frequency=100)
 
     criterion = nn.CrossEntropyLoss()
     entropy_loss_func = MultinomialEntropy(opts.regularizer_strength)
-
-    if opts.use_wandb:
-        wandb.watch(ats_model, log_freq=100)
 
     for epoch in range(opts.epochs):
         train_loss, train_metrics = train(ats_model, optimizer, train_loader,
@@ -60,15 +51,10 @@ def main(opts):
         with torch.no_grad():
             test_loss, test_metrics = evaluate(ats_model, test_loader, criterion,
                                                entropy_loss_func, opts)
-        if opts.use_wandb:
-            log_dict = {"epoch": epoch, "train_loss": train_loss, "test_loss": test_loss}
-            for metric in train_metrics:
-                log_dict["train_" + metric] = train_metrics[metric]
-            for metric in test_metrics:
-                log_dict["test_" + metric] = test_metrics[metric]
-            wandb.log(log_dict)
 
-        logger(epoch, (train_loss, test_loss), (train_metrics, test_metrics))
+        images = logger(epoch, (train_loss, test_loss), (train_metrics, test_metrics), return_images=True)
+        wandb_logger(epoch, (train_loss, test_loss), (train_metrics, test_metrics), images)
+
         model_checkpoint(epoch, test_loss)
 
         scheduler.step()

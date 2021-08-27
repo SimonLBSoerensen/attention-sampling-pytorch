@@ -13,19 +13,13 @@ from models.classifier import ClassificationHead
 
 from ats.core.ats_layer import ATSModel
 from ats.utils.regularizers import MultinomialEntropy
-from ats.utils.logging import TrainingLogger
+from ats.utils.logging import TrainingLogger, WandBLogger
 from ats.utils.model_checkpoint import ModelCheckpoint
 
 from dataset.speed_limits_dataset import SpeedLimits
 from train import train, evaluate
 
-import wandb
-
-
 def main(opts):
-    if opts.use_wandb:
-        wandb.init(project="traffic_data")
-
     train_dataset = SpeedLimits('dataset/traffic_data', train=True)
     train_loader = DataLoader(train_dataset, batch_size=opts.batch_size, shuffle=True, num_workers=opts.num_workers)
 
@@ -49,6 +43,7 @@ def main(opts):
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=opts.decrease_lr_at, gamma=0.1)
 
     logger = TrainingLogger(opts.output_dir, ats_model, test_dataset)
+    wandb_logger = WandBLogger(ats_model, 100, project="traffic_data")
 
     model_folder = os.path.join(opts.output_dir, opts.run_name, "saves")
     model_checkpoint = ModelCheckpoint(model_folder, ats_model, optimizer, save_best=True, save_frequency=100)
@@ -60,9 +55,6 @@ def main(opts):
     criterion = nn.CrossEntropyLoss(weight=class_weights)
     entropy_loss_func = MultinomialEntropy(opts.regularizer_strength)
 
-    if opts.use_wandb:
-        wandb.watch(ats_model, log_freq=100)
-
     for epoch in range(opts.epochs):
         train_loss, train_metrics = train(ats_model, optimizer, train_loader,
                                           criterion, entropy_loss_func, opts)
@@ -71,16 +63,9 @@ def main(opts):
             test_loss, test_metrics = evaluate(ats_model, test_loader, criterion,
                                                entropy_loss_func, opts)
 
-        # Log results
-        if opts.use_wandb:
-            log_dict = {"epoch": epoch, "train_loss": train_loss, "test_loss": test_loss}
-            for metric in train_metrics:
-                log_dict["train_" + metric] = train_metrics[metric]
-            for metric in test_metrics:
-                log_dict["test_" + metric] = test_metrics[metric]
-            wandb.log(log_dict)
+        images = logger(epoch, (train_loss, test_loss), (train_metrics, test_metrics), return_images=True)
+        wandb_logger(epoch, (train_loss, test_loss), (train_metrics, test_metrics), images)
 
-        logger(epoch, (train_loss, test_loss), (train_metrics, test_metrics))
         model_checkpoint(epoch, test_loss)
 
         # Perform scheduler step
@@ -102,7 +87,6 @@ if __name__ == '__main__':
     parser.add_argument("--clipnorm", type=float, default=1, help="Clip the norm of the gradients")
     parser.add_argument("--output_dir", type=str, help="An output directory", default='output/traffic')
     parser.add_argument('--run_name', type=str, default='run')
-    parser.add_argument('--use_wandb', type=bool, default=True)
     parser.add_argument('--save_best', type=bool, default=True)
     parser.add_argument("--saving_epoch", type=int, default=100, help="How many epochs between each save")
     parser.add_argument('--num_workers', type=int, default=30, help='Number of workers to use for data loading')

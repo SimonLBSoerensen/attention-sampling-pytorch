@@ -330,7 +330,8 @@ class SpeedLimits(Dataset):
         x_high = self.image_transform(x_high)
 
         # Down scale the high resolution image to the low resolution there is used for the attention map
-        x_low = F.interpolate(x_high[None, ...], scale_factor=0.3, mode='bilinear')[0]
+        x_low = F.interpolate(x_high[None, ...], scale_factor=0.3, mode='bilinear',
+                              align_corners=False, recompute_scale_factor=True)[0]
 
         # Return the low resolution, high resolution and class of the given index
         return x_low, x_high, category

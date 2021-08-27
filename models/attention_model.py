@@ -9,16 +9,16 @@ class AttentionModelTrafficSigns(nn.Module):
                  softmax_smoothing=0.0):
         super(AttentionModelTrafficSigns, self).__init__()
 
-        conv1 = nn.Conv2d(in_channels=3, out_channels=8, kernel_size=3, padding_mode='reflect')
+        conv1 = nn.Conv2d(in_channels=3, out_channels=8, kernel_size=3, padding_mode='zeros')
         relu1 = nn.ReLU()
 
-        conv2 = nn.Conv2d(in_channels=8, out_channels=16, kernel_size=3, padding_mode='reflect')
+        conv2 = nn.Conv2d(in_channels=8, out_channels=16, kernel_size=3, padding_mode='zeros')
         relu2 = nn.ReLU()
 
-        conv3 = nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, padding_mode='reflect')
+        conv3 = nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, padding_mode='zeros')
         relu3 = nn.ReLU()
 
-        conv4 = nn.Conv2d(in_channels=32, out_channels=1, kernel_size=3, padding_mode='reflect')
+        conv4 = nn.Conv2d(in_channels=32, out_channels=1, kernel_size=3, padding_mode='zeros')
 
         pool = nn.MaxPool2d(kernel_size=8)
         sample_softmax = SampleSoftmax(squeeze_channels, softmax_smoothing)

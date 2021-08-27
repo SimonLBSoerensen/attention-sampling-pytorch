@@ -42,10 +42,11 @@ def main(opts):
                             ], lr=opts.lr)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=opts.decrease_lr_at, gamma=0.1)
 
-    logger = TrainingLogger(opts.output_dir, ats_model, test_dataset)
-    wandb_logger = WandBLogger(ats_model, 100, project="traffic_data")
+    run_folder = os.path.join(opts.output_dir, opts.run_name)
+    logger = TrainingLogger(run_folder, ats_model, test_dataset, project="traffic_data",
+                            make_images_every=opts.make_images_every)
 
-    model_folder = os.path.join(opts.output_dir, opts.run_name, "saves")
+    model_folder = os.path.join(run_folder, "saves")
     model_checkpoint = ModelCheckpoint(model_folder, ats_model, optimizer, save_best=True, save_frequency=100)
 
 
@@ -63,15 +64,15 @@ def main(opts):
             test_loss, test_metrics = evaluate(ats_model, test_loader, criterion,
                                                entropy_loss_func, opts)
 
-        images = logger(epoch, (train_loss, test_loss), (train_metrics, test_metrics), return_images=True)
-        wandb_logger(epoch, (train_loss, test_loss), (train_metrics, test_metrics), images)
+        logger(epoch, (train_loss, test_loss), (train_metrics, test_metrics), return_images=True)
+
 
         model_checkpoint(epoch, test_loss)
 
         # Perform scheduler step
         scheduler.step()
 
-
+#
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--regularizer_strength", type=float, default=0.05,
@@ -82,13 +83,14 @@ if __name__ == '__main__':
     parser.add_argument("--n_patches", type=int, default=5, help="How many patches to sample")
     parser.add_argument("--patch_size", type=int, default=100, help="Patch size of a square patch")
     parser.add_argument("--batch_size", type=int, default=32, help="Choose the batch size for SGD")
-    parser.add_argument("--epochs", type=int, default=1500, help="How many epochs to train for")
-    parser.add_argument("--decrease_lr_at", type=float, default=250, help="Decrease the learning rate in this epoch")
+    parser.add_argument("--epochs", type=int, default=10_000, help="How many epochs to train for")
+    parser.add_argument("--decrease_lr_at", type=float, default=5_000, help="Decrease the learning rate in this epoch")
     parser.add_argument("--clipnorm", type=float, default=1, help="Clip the norm of the gradients")
     parser.add_argument("--output_dir", type=str, help="An output directory", default='output/traffic')
     parser.add_argument('--run_name', type=str, default='run')
     parser.add_argument('--save_best', type=bool, default=True)
-    parser.add_argument("--saving_epoch", type=int, default=100, help="How many epochs between each save")
+    parser.add_argument("--saving_epoch", type=int, default=500, help="How many epochs between each save")
+    parser.add_argument("--make_images_every", type=int, default=1, help="How many epochs between each image log")
     parser.add_argument('--num_workers', type=int, default=30, help='Number of workers to use for data loading')
 
     opts = parser.parse_args()

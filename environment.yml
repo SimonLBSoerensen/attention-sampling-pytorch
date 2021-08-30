@@ -1,4 +1,4 @@
-name: attention-sampling-pytorch_3
+name: attention-sampling-pytorch
 channels:
   - pytorch
   - nvidia

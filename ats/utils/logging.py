@@ -110,16 +110,20 @@ class TrainingLogger:
     Save information about the training (losses, metrics, attention maps)
     """
 
-    def __init__(self, output_directory, ats_model, dataset, project, use_wandb=True, device=None, keep_on_gpu=True, make_images_every=1,
-                 nsamples=9, nrow=3):
+    def __init__(self, output_directory, ats_model, dataset, project, use_wandb=True, device=None, write_tensorboard=True,
+                 keep_on_gpu=True, make_images_every=1, nsamples=9, nrow=3, send_images_every=None, save_images_to_disk=True):
         # Check if cuda is available and if no device was given then set device accordingly
         cuda_is_available = torch.cuda.is_available()
         if device is None:
             device = torch.device("cuda") if cuda_is_available else torch.device("cpu")
         self.device = device
+        self.save_images_to_disk = save_images_to_disk
         self.make_images_every = make_images_every
         self.dir = output_directory
         os.makedirs(self.dir, exist_ok=True)
+        self.write_tensorboard = write_tensorboard
+        self.image_out_root = os.path.join(self.dir, "attention")
+        os.makedirs(self.image_out_root, exist_ok=True)
 
         self.ats_model = ats_model
         self.nrow = nrow
@@ -137,15 +141,31 @@ class TrainingLogger:
         self.labels = torch.LongTensor([d[2] for d in data]).numpy()
 
         self.use_wandb = use_wandb
+        self.send_images_every = send_images_every
         if self.use_wandb:
             self.wandb_logger = WandBLogger(project=project)
 
         self.fileWriter = FileWriter(self.dir)
 
-        self.writer = SummaryWriter(self.dir, flush_secs=5)
+        if self.write_tensorboard:
+            self.writer = SummaryWriter(self.dir, flush_secs=5)
         self.on_train_begin()
 
+    def save_images(self, epoch, images):
+        if self.save_images_to_disk:
+            for image_type in images:
+                image_type_folder = os.path.join(self.image_out_root, image_type)
+                os.makedirs(image_type_folder, exist_ok=True)
 
+                if len(images[image_type]) == 1:
+                    images[image_type][0].save(os.path.join(image_type_folder, f"{epoch}.png"))
+                else:
+                    for i, image in enumerate(images[image_type]):
+                        image.save(os.path.join(image_type_folder, f"{epoch}_{i}.png"))
+
+    def tensorboard_and_image(self, name, image, global_step, dataformats):
+        if self.write_tensorboard:
+            self.writer.add_image(name, image, global_step=global_step, dataformats=dataformats)
 
     def on_train_begin(self):
         # Save a grid with the images used for att images
@@ -156,16 +176,18 @@ class TrainingLogger:
 
         grid = torchvision.utils.make_grid(image_list, nrow=self.nrow, normalize=True, scale_each=True)
 
-        self.writer.add_image('original_images', grid, global_step=0, dataformats='CHW')
+        self.tensorboard_and_image('original_images', grid, global_step=0, dataformats='CHW')
+        images = {
+            "original_images": [transforms.ToPILImage()(grid)]
+        }
+        self.save_images(-1, images)
         self.__call__(-1, return_images=False)
 
         if self.use_wandb:
-            self.wandb_logger.log_image(0, {
-                "original_images": [transforms.ToPILImage()(grid)]
-            })
+            self.wandb_logger.log_image(0, images)
 
     def __call__(self, epoch, losses=None, metrics=None, return_images=False,
-                 use_masked_superimposed=True, color_map=cv2.COLORMAP_JET):
+                 use_masked_superimposed=False, color_map=cv2.COLORMAP_JET):
         if metrics is not None:
             if len(metrics) == 1:
                 self._add_metric(metrics[0], epoch, split="Train")
@@ -185,7 +207,7 @@ class TrainingLogger:
         self.fileWriter(epoch, losses, metrics)
 
         image_epoch = (epoch % self.make_images_every == 0) \
-                      and self.make_images_every and epoch > 0
+                      and self.make_images_every or epoch < 0
 
         if image_epoch:
             with torch.no_grad():
@@ -212,7 +234,7 @@ class TrainingLogger:
                 superimposed = cv2.addWeighted(heat_map, 0.5, x_low_np, 0.5, 0)
 
                 if use_masked_superimposed:
-                    _, thres = cv2.threshold(att_np_norm, int(255 * 0.5), 255, cv2.THRESH_BINARY)
+                    _, thres = cv2.threshold(att_np_norm, int(255 * 0.1), 255, cv2.THRESH_BINARY)
                     fin = cv2.addWeighted(heat_map, 0.4, x_low_np, 0.6, 0)
                     fin_masked = cv2.bitwise_and(fin, fin, mask=thres)
                     x_low_np_masked = cv2.bitwise_and(x_low_np, x_low_np, mask=255 - thres)
@@ -227,22 +249,25 @@ class TrainingLogger:
             # Make a image grid of the attention maps and save it in the tensorboard log file
             attention_grid = torchvision.utils.make_grid(att, nrow=self.nrow, normalize=True, scale_each=True,
                                                          pad_value=1)
-            self.writer.add_image('attention_map', attention_grid, epoch, dataformats='CHW')
+            self.tensorboard_and_image('attention_map', attention_grid, epoch, dataformats='CHW')
 
             # Make a image grid of the superimposed and save it in the tensorboard log file
             superimposed_grid = torchvision.utils.make_grid(superimposed_list, nrow=self.nrow, normalize=True,
                                                             scale_each=True, pad_value=1)
-            self.writer.add_image('superimposed', superimposed_grid, epoch, dataformats='CHW')
+            self.tensorboard_and_image('superimposed', superimposed_grid, epoch, dataformats='CHW')
             images = {
                 "attention_grid": [transforms.ToPILImage()(attention_grid)],
                 "superimposed_grid": [transforms.ToPILImage()(superimposed_grid)]
             }
+            self.save_images(epoch, images)
+
         else:
             images = None
 
-        if self.use_wandb and epoch > 0:
+        if self.use_wandb and epoch > 0 and epoch % self.send_images_every == 0:
             self.wandb_logger(epoch, losses, metrics, images)
 
     def _add_metric(self, metric, epoch, split):
-        for metric_name in metric:
-            self.writer.add_scalar(f'{metric_name.capitalize()}/{split.capitalize()}', metric[metric_name], epoch)
+        if self.write_tensorboard:
+            for metric_name in metric:
+                self.writer.add_scalar(f'{metric_name.capitalize()}/{split.capitalize()}', metric[metric_name], epoch)

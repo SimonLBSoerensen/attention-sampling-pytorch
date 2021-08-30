@@ -4,12 +4,12 @@
 - [ ] Comment more code
 - [ ] Make template dataset file
 
-# Tensorboard 
+# Logging 
 - [x] Make overlay version of heatmap
 
 # Datasets
 - [ ] Mega MNIST might have a error
 
 # Others
-- [ ] Update requirements.txt
-    - [ ] Add pytorch again 
+- [x] Update requirements.txt
+- [x] Make conda environment file

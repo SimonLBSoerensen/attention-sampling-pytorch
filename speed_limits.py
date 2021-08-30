@@ -83,7 +83,7 @@ if __name__ == '__main__':
     parser.add_argument("--n_patches", type=int, default=5, help="How many patches to sample")
     parser.add_argument("--patch_size", type=int, default=100, help="Patch size of a square patch")
     parser.add_argument("--batch_size", type=int, default=32, help="Choose the batch size for SGD")
-    parser.add_argument("--epochs", type=int, default=1000, help="How many epochs to train for")
+    parser.add_argument("--epochs", type=int, default=5000, help="How many epochs to train for")
     parser.add_argument("--decrease_lr_at", type=float, default=-2, help="Decrease the learning rate in this epoch, "
                                                                          "If -2 the decrease will happen at epochs//2 "
                                                                          "and -1 will turn it off")
@@ -91,9 +91,9 @@ if __name__ == '__main__':
     parser.add_argument("--output_dir", type=str, help="An output directory", default='output/traffic')
     parser.add_argument('--run_name', type=str, default='run')
     parser.add_argument('--save_best', type=bool, default=True)
-    parser.add_argument('--use_wandb', type=bool, default=False)
+    parser.add_argument('--use_wandb', type=bool, default=True)
     parser.add_argument("--saving_epoch", type=int, default=500, help="How many epochs between each save")
-    parser.add_argument("--make_images_every", type=int, default=1, help="How many epochs between each image log")
+    parser.add_argument("--make_images_every", type=int, default=10, help="How many epochs between each image log")
     parser.add_argument("--send_images_every", type=int, default=100, help="How many epochs between each image log is send to wandb")
     parser.add_argument('--num_workers', type=int, default=30, help='Number of workers to use for data loading')
 

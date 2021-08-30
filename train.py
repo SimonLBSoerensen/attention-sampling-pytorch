@@ -17,7 +17,7 @@ def train(model, optimizer, train_loader, criterion, entropy_loss_func, opts):
     # Put model in training mode
     model.train()
 
-    for i, (x_low, x_high, label) in enumerate(tqdm(train_loader)):
+    for i, (x_low, x_high, label) in enumerate(tqdm(train_loader, desc="Training:")):
         x_low, x_high, label = move_to([x_low, x_high, label], opts.device)
 
         optimizer.zero_grad()
@@ -52,7 +52,7 @@ def evaluate(model, test_loader, criterion, entropy_loss_func, opts):
     # Put model in eval mode
     model.eval()
 
-    for i, (x_low, x_high, label) in enumerate(tqdm(test_loader)):
+    for i, (x_low, x_high, label) in enumerate(tqdm(test_loader, desc="Evaluating:")):
 
         x_low, x_high, label = move_to([x_low, x_high, label], opts.device)
 

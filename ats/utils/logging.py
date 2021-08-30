@@ -110,8 +110,10 @@ class TrainingLogger:
     Save information about the training (losses, metrics, attention maps)
     """
 
-    def __init__(self, output_directory, ats_model, dataset, project, use_wandb=True, device=None, write_tensorboard=True,
-                 keep_on_gpu=True, make_images_every=1, nsamples=9, nrow=3, send_images_every=None, save_images_to_disk=True):
+    def __init__(self, output_directory, ats_model, dataset, project, use_wandb=True, device=None,
+                 write_tensorboard=True,
+                 keep_on_gpu=True, make_images_every=1, nsamples=9, nrow=3, send_images_every=None,
+                 save_images_to_disk=True):
         # Check if cuda is available and if no device was given then set device accordingly
         cuda_is_available = torch.cuda.is_available()
         if device is None:
@@ -122,7 +124,7 @@ class TrainingLogger:
         self.dir = output_directory
         os.makedirs(self.dir, exist_ok=True)
         self.write_tensorboard = write_tensorboard
-        self.image_out_root = os.path.join(self.dir, "attention")
+        self.image_out_root = os.path.join(self.dir, "images")
         os.makedirs(self.image_out_root, exist_ok=True)
 
         self.ats_model = ats_model
@@ -170,7 +172,7 @@ class TrainingLogger:
     def on_train_begin(self):
         # Save a grid with the images used for att images
         with torch.no_grad():
-            _, _, _, x_low = self.ats_model(self.x_low.to(self.device), self.x_high.to(self.device))
+            _, _, _, x_low, _ = self.ats_model(self.x_low.to(self.device), self.x_high.to(self.device))
             x_low = x_low.cpu()
             image_list = [x for x in x_low]
 
@@ -213,15 +215,18 @@ class TrainingLogger:
             with torch.no_grad():
                 # Get the attention maps, interpolate them to the same size as the
                 # low image resolution images and bring them to the CPU
-                _, att, _, x_low = self.ats_model(self.x_low.to(self.device), self.x_high.to(self.device))
+                _, att, _, x_low, offsets = self.ats_model(self.x_low.to(self.device), self.x_high.to(self.device))
                 att = att.unsqueeze(1)
                 att = F.interpolate(att, size=(x_low.shape[-2], x_low.shape[-1]))
                 att = att.cpu()
 
                 x_low = x_low.cpu()
 
+            x_high_np = self.x_high.cpu().permute(0, 2, 3, 1).numpy()
+
             superimposed_list = []
-            for att_el, x_low_el in zip(att, x_low):
+            vision_list = []
+            for att_el, x_low_el, x_high_el in zip(att, x_low, x_high_np):
                 x_low_np = x_low_el.permute(1, 2, 0).numpy()
                 x_low_np = (x_low_np * 255).astype(np.uint8)
 
@@ -229,7 +234,7 @@ class TrainingLogger:
                 att_np_norm = (att_np - att_np.min()) / (att_np.max() - att_np.min())
                 att_np_norm = (att_np_norm * 255).astype(np.uint8)
 
-                heat_map = cv2.applyColorMap(255-att_np_norm, color_map)
+                heat_map = cv2.applyColorMap(255 - att_np_norm, color_map)
 
                 superimposed = cv2.addWeighted(heat_map, 0.5, x_low_np, 0.5, 0)
 
@@ -243,29 +248,48 @@ class TrainingLogger:
                 else:
                     superimposed_list.append(superimposed)
 
+                att_np_norm_high = cv2.resize(att_np_norm, x_high_el.shape[1::-1], interpolation=cv2.INTER_CUBIC)
+                vision = x_high_el * (att_np_norm_high[:, :, np.newaxis]/255.)
+                vision_list.append(vision)
+
             superimposed_list = torch.from_numpy((np.array(superimposed_list) / 255.).astype(np.float32))
             superimposed_list = superimposed_list.permute(0, 3, 1, 2)
 
-            # Make a image grid of the attention maps and save it in the tensorboard log file
+            vision_list = torch.from_numpy((np.array(vision_list) / 255.).astype(np.float32))
+            vision_list = vision_list.permute(0, 3, 1, 2)
+
+            # Make a image grid of the attention maps
             attention_grid = torchvision.utils.make_grid(att, nrow=self.nrow, normalize=True, scale_each=True,
                                                          pad_value=1)
-            self.tensorboard_and_image('attention_map', attention_grid, epoch, dataformats='CHW')
 
-            # Make a image grid of the superimposed and save it in the tensorboard log file
+            # Make a image grid of the superimposed
             superimposed_grid = torchvision.utils.make_grid(superimposed_list, nrow=self.nrow, normalize=True,
                                                             scale_each=True, pad_value=1)
+
+            # Make a image grid of the superimposed
+            vision_grid = torchvision.utils.make_grid(vision_list, nrow=self.nrow, normalize=True,
+                                                            scale_each=True, pad_value=1)
+
+            self.tensorboard_and_image('attention_map', attention_grid, epoch, dataformats='CHW')
             self.tensorboard_and_image('superimposed', superimposed_grid, epoch, dataformats='CHW')
+            self.tensorboard_and_image('vision', vision_grid, epoch, dataformats='CHW')
+
             images = {
                 "attention_grid": [transforms.ToPILImage()(attention_grid)],
-                "superimposed_grid": [transforms.ToPILImage()(superimposed_grid)]
+                "superimposed_grid": [transforms.ToPILImage()(superimposed_grid)],
+                "vision_grid": [transforms.ToPILImage()(vision_grid)]
             }
             self.save_images(epoch, images)
 
         else:
             images = None
 
-        if self.use_wandb and epoch > 0 and epoch % self.send_images_every == 0:
-            self.wandb_logger(epoch, losses, metrics, images)
+        if self.use_wandb and epoch > 0:
+            if epoch % self.send_images_every == 0:
+                wandb_images = images
+            else:
+                wandb_images = None
+            self.wandb_logger(epoch, losses, metrics, wandb_images)
 
     def _add_metric(self, metric, epoch, split):
         if self.write_tensorboard:

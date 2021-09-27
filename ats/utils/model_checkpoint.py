@@ -2,7 +2,6 @@ import os
 import numpy as np
 import torch
 
-# TODO test if they work------------------------------------------
 def save_checkpoint(model, optimizer, save_path, epoch):
     state_dict = {}
     state_dict['model_state_dict'] = model.state_dict()
@@ -17,7 +16,6 @@ def load_checkpoint(model, optimizer, load_path):
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
     epoch = checkpoint['epoch']
     return model, optimizer, epoch
-#----------------------------------------------------------------
 
 
 class ModelCheckpoint:

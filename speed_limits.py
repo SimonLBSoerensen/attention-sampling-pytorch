@@ -14,7 +14,7 @@ from models.classifier import ClassificationHead
 from ats.core.ats_layer import ATSModel
 from ats.utils.regularizers import MultinomialEntropy
 from ats.utils.logging import TrainingLogger, WandBLogger
-from ats.utils.model_checkpoint import ModelCheckpoint
+from ats.utils.model_checkpoint import ModelCheckpoint, load_checkpoint
 
 from dataset.speed_limits_dataset import SpeedLimits
 from train import train, evaluate
@@ -47,7 +47,8 @@ def main(opts):
                             make_images_every=opts.make_images_every, send_images_every=opts.send_images_every)
 
     model_folder = os.path.join(run_folder, "saves")
-    model_checkpoint = ModelCheckpoint(model_folder, ats_model, optimizer, save_best=True, save_frequency=100)
+    model_checkpoint = ModelCheckpoint(model_folder, ats_model, optimizer,
+                                       save_best=opts.save_best, save_frequency=opts.save_frequency)
 
 
     class_weights = train_dataset.class_frequencies
@@ -92,7 +93,7 @@ if __name__ == '__main__':
     parser.add_argument('--run_name', type=str, default='run')
     parser.add_argument('--save_best', type=bool, default=True)
     parser.add_argument('--use_wandb', type=bool, default=True)
-    parser.add_argument("--saving_epoch", type=int, default=500, help="How many epochs between each save")
+    parser.add_argument("--save_frequency", type=int, default=500, help="How many epochs between each save")
     parser.add_argument("--make_images_every", type=int, default=10, help="How many epochs between each image log")
     parser.add_argument("--send_images_every", type=int, default=100, help="How many epochs between each image log is send to wandb")
     parser.add_argument('--num_workers', type=int, default=30, help='Number of workers to use for data loading')

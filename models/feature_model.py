@@ -1,6 +1,9 @@
 import torch.nn as nn
+import torch
 import torch.nn.functional as F
 import pdb
+
+import torchvision
 
 
 def conv_layer(in_channels, out_channels, kernel, strides, padding=1):
@@ -77,6 +80,19 @@ class FeatureModelTrafficSigns(nn.Module):
         out = self.bn1(out)
         out = self.relu1(out)
         out = self.pool(out)
+        out = out.view(out.shape[0], out.shape[1])
+        out = F.normalize(out, p=2, dim=-1)
+        return out
+
+
+class FeatureModelJD(nn.Module):
+    def __init__(self):
+        super(FeatureModelJD, self).__init__()
+        self.rnet = torchvision.models.resnet50(pretrained=True)
+        self.rnet = torch.nn.Sequential(*(list(self.rnet.children())[:-1]))
+
+    def forward(self, x):
+        out = self.rnet(x)
         out = out.view(out.shape[0], out.shape[1])
         out = F.normalize(out, p=2, dim=-1)
         return out

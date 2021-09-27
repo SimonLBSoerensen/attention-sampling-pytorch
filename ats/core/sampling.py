@@ -9,12 +9,11 @@ def _sample_with_replacement(logits, n_samples):
     distribution = dist.categorical.Categorical(logits=logits)
     return distribution.sample(sample_shape=torch.Size([n_samples])).transpose(0, 1)
 
-
 def _sample_without_replacement(logits, n_samples):
     """Sample without replacement using the Gumbel-max trick.
     See lips.cs.princeton.edu/the-gumbel-max-trick-for-discrete-distributions/
     """
-    z = -torch.log(-torch.log(torch.rand_like(logits)))
+    z = torch.log(-torch.log(torch.rand_like(logits)))
     return torch.topk(logits+z, k=n_samples)[1]
 
 
@@ -27,7 +26,7 @@ def unravel_index(index, shape):
 
 
 def sample(n_samples, attention, sample_space, replace=False,
-           use_logits=False):
+           is_logits=False):
     """Sample from the passed in attention distribution.
     Arguments
     ---------
@@ -36,10 +35,10 @@ def sample(n_samples, attention, sample_space, replace=False,
                or normalized)
     sample_space: This should always equal K.shape(attention)[1:]
     replace: bool, sample with replacement if set to True (defaults to False)
-    use_logits: bool, assume the input is logits if set to True (defaults to False)
+    is_logits: bool, assume the input is logits if set to True (defaults to False)
     """
     # Make sure we have logits and choose replacement or not
-    logits = attention if use_logits else torch.log(attention)
+    logits = attention if is_logits else torch.log(attention)
     sampling_function = (
         _sample_with_replacement if replace
         else _sample_without_replacement

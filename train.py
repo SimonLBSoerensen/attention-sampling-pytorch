@@ -10,7 +10,7 @@ from utils import calc_cls_measures, move_to
 def train(model, optimizer, train_loader, criterion, entropy_loss_func, opts):
     """ Train for a single epoch """
 
-    y_probs = np.zeros((0, len(train_loader.dataset.CLASSES)), np.float)
+    y_probs = np.zeros((0, train_loader.dataset.number_of_classes), np.float)
     y_trues = np.zeros((0), np.int)
     losses = []
 
@@ -21,7 +21,7 @@ def train(model, optimizer, train_loader, criterion, entropy_loss_func, opts):
         x_low, x_high, label = move_to([x_low, x_high, label], opts.device)
 
         optimizer.zero_grad()
-        y, attention_map, patches, x_low = model(x_low, x_high)
+        y, attention_map, patches, x_low, offsets = model(x_low, x_high)
 
         entropy_loss = entropy_loss_func(attention_map)
 
@@ -45,7 +45,7 @@ def train(model, optimizer, train_loader, criterion, entropy_loss_func, opts):
 def evaluate(model, test_loader, criterion, entropy_loss_func, opts):
     """ Evaluate a single epoch """
 
-    y_probs = np.zeros((0, len(test_loader.dataset.CLASSES)), np.float)
+    y_probs = np.zeros((0, test_loader.dataset.number_of_classes), np.float)
     y_trues = np.zeros((0), np.int)
     losses = []
 
@@ -56,7 +56,7 @@ def evaluate(model, test_loader, criterion, entropy_loss_func, opts):
 
         x_low, x_high, label = move_to([x_low, x_high, label], opts.device)
 
-        y, attention_map, patches, x_low = model(x_low, x_high)
+        y, attention_map, patches, x_low, offsets = model(x_low, x_high)
 
         entropy_loss = entropy_loss_func(attention_map)
         loss = criterion(y, label) - entropy_loss

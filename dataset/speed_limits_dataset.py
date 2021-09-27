@@ -14,6 +14,21 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 import numpy as np
 
+def make_weights_for_balanced_classes(classes, num_classes):
+    count = [0] * num_classes
+    for c in classes:
+        count[c] += 1
+    weight_per_class = [0.] * num_classes
+
+    N = float(sum(count))
+    for i in range(num_classes):
+        weight_per_class[i] = N / float(count[i])
+    weight = [0] * len(classes)
+
+    for idx, c in enumerate(classes):
+        weight[idx] = weight_per_class[c]
+    return weight
+
 
 def check_file(filepath, md5sum):
     """Check a file against an md5 hash value.
@@ -341,6 +356,14 @@ class SpeedLimits(Dataset):
         return self[0][0].shape[1:]
 
     @property
+    def number_of_classes(self):
+        return len(self.CLASSES)
+
+    @property
+    def unique_classes(self):
+        return self.CLASSES
+
+    @property
     def class_frequencies(self):
         """Compute and return the class specific frequencies."""
         freqs = np.zeros(len(self.CLASSES), dtype=np.float32)
@@ -363,20 +386,6 @@ class SpeedLimits(Dataset):
                 if len(idxs) >= N:
                     break
         return idxs
-
-
-def make_weights_for_balanced_classes(images, num_classes):
-    count = [0] * num_classes
-    for item in images:
-        count[item[1]] += 1
-    weight_per_class = [0.] * num_classes
-    N = float(sum(count))
-    for i in range(num_classes):
-        weight_per_class[i] = N / float(count[i])
-    weight = [0] * len(images)
-    for idx, val in enumerate(images):
-        weight[idx] = weight_per_class[val[1]]
-    return weight
 
 
 def reverse_transform(inp):

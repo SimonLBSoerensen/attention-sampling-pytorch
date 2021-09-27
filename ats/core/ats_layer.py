@@ -26,12 +26,12 @@ class SamplePatches(nn.Module):
     """
 
     def __init__(self, n_patches, patch_size, receptive_field=0, replace=False,
-                 use_logits=False, **kwargs):
+                 is_logits=False, **kwargs):
         self._n_patches = n_patches
         self._patch_size = (patch_size, patch_size)
         self._receptive_field = receptive_field
         self._replace = replace
-        self._use_logits = use_logits
+        self._is_logits = is_logits
 
         super(SamplePatches, self).__init__(**kwargs)
 
@@ -56,7 +56,7 @@ class SamplePatches(nn.Module):
             attention,
             sample_space,
             replace=self._replace,
-            use_logits=self._use_logits
+            is_logits=self._is_logits
         )
 
         offsets = torch.zeros_like(samples).float()
@@ -68,7 +68,7 @@ class SamplePatches(nn.Module):
         x_low = x_low.permute(0, 2, 3, 1)
         x_high = x_high.permute(0, 2, 3, 1)
         assert x_low.shape[-1] == x_high.shape[-1], "Channels should be last for now"
-        patches, _ = FromTensors([x_low, x_high], None).patches(
+        patches, offsets = FromTensors([x_low, x_high], None).patches(
             samples,
             offsets,
             sample_space,
@@ -78,7 +78,7 @@ class SamplePatches(nn.Module):
             1
         )
 
-        return [patches, sampled_attention]
+        return [patches, sampled_attention, offsets]
 
 
 class ATSModel(nn.Module):
@@ -120,7 +120,7 @@ class ATSModel(nn.Module):
         attention_map = self.attention_model(x_low)
 
         # Then we sample patches based on the attention
-        patches, sampled_attention = self.sampler(x_low, x_high, attention_map)
+        patches, sampled_attention, offsets = self.sampler(x_low, x_high, attention_map)
 
         # We compute the features of the sampled patches
         channels = patches.shape[2]
@@ -133,4 +133,4 @@ class ATSModel(nn.Module):
 
         y = self.classifier(sample_features)
 
-        return y, attention_map, patches, x_low
+        return y, attention_map, patches, x_low, offsets

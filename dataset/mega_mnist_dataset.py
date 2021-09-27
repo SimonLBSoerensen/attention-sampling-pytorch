@@ -69,7 +69,7 @@ class MNIST(Dataset):
 
         if per_class:
             for c in self._uclasses:
-                replace = len(self._class_indexs[c]) >= per_class
+                replace = len(self._class_indexs[c]) <= per_class
                 idxs += list(np.random.choice(self._class_indexs[c], per_class, replace=replace))
 
         if left_over:
